@@ -1,11 +1,23 @@
 from flask import Flask, request, make_response, render_template_string
+from flask_sqlalchemy import SQLAlchemy
+import os
 import re
 from AutoCalendarV4 import parseCourses, generateICS
 
 app = Flask(__name__)
 
-# Path to the file that will store the emails.
-EMAILS_FILE = "emails.txt"
+# Get database URL from Railway's environment variables
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL is missing. Set it in Railway's environment variables.")
+
+# Fix potential "postgres://" bug (Railway uses "postgres://", but SQLAlchemy expects "postgresql://")
+app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL.replace("postgres://", "postgresql://")
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+# Initialize the database
+db = SQLAlchemy(app)
 
 # HTML template with Tailwind CSS styling, instructions for Outlook, thank-you box, and email input.
 form_template = """
@@ -87,50 +99,29 @@ form_template = """
 </html>
 """
 
-# A simple regular expression for basic email validation.
+# Email regex validation
 EMAIL_REGEX = r'^[\w\.-]+@[\w\.-]+\.\w+$'
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    """
-    The index route handles both GET and POST requests.
-    
-    - GET: Displays the form along with instructions on how to add the ICS file to Outlook and a thank you message.
-    - POST: Validates the provided email, processes the submitted course info, parses the data,
-            generates the ICS file, logs the email, and triggers a file download.
-    """
     if request.method == 'POST':
-        # Retrieve the email and course info from the form.
         user_email = request.form.get('user_email', '').strip()
-        input_text = request.form.get('course_data', '')
-        # Normalize newlines and remove extra whitespace.
-        input_text = input_text.replace("\r\n", "\n").strip()
-        
-        # Validate the email using a simple regex.
+        input_text = request.form.get('course_data', '').replace("\r\n", "\n").strip()
+
+        # Validate email
         if not re.match(EMAIL_REGEX, user_email):
-            # If email is invalid, re-render the template with an error message.
-            error_message = "Please enter a valid email address."
-            return render_template_string(form_template, error=error_message)
-        
-        # # Append the valid email to the emails file.
-        # with open(EMAILS_FILE, "a", encoding="utf-8") as f:
-        #     f.write(user_email + "\n")
-        
-        # Parse the courses from the input text using the provided function.
+            return render_template_string(form_template, error="Please enter a valid email address.")
+
+        # Parse courses and generate ICS file
         parsedCourses = parseCourses(input_text)
-        # Generate the ICS file content using the provided function.
         icsContent = generateICS(parsedCourses)
-        
-        # Create a response with the ICS content.
+
         response = make_response(icsContent)
-        # Set headers to prompt a file download with the name 'courses.ics'.
         response.headers["Content-Disposition"] = "attachment; filename=courses.ics"
         response.headers["Content-Type"] = "text/calendar"
         return response
-    else:
-        # Render the HTML form and additional information for GET requests.
-        return render_template_string(form_template)
+
+    return render_template_string(form_template)
 
 if __name__ == "__main__":
-    # Run the Flask development server in debug mode.
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=5000)
