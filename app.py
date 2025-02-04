@@ -142,18 +142,5 @@ def index():
 
     return render_template_string(form_template)
 
-# Route to view all stored emails
-@app.route('/emails')
-def show_emails():
-    emails = UserEmail.query.all()  # Get all emails from the database
-    return render_template_string("""
-    <h1>Stored Emails</h1>
-    <ul>
-        {% for email in emails %}
-        <li>{{ email.email }}</li>
-        {% endfor %}
-    </ul>
-    """, emails=emails)
-
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
