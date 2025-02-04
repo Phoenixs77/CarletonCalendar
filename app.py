@@ -112,9 +112,9 @@ def index():
             error_message = "Please enter a valid email address."
             return render_template_string(form_template, error=error_message)
         
-        # Append the valid email to the emails file.
-        with open(EMAILS_FILE, "a", encoding="utf-8") as f:
-            f.write(user_email + "\n")
+        # # Append the valid email to the emails file.
+        # with open(EMAILS_FILE, "a", encoding="utf-8") as f:
+        #     f.write(user_email + "\n")
         
         # Parse the courses from the input text using the provided function.
         parsedCourses = parseCourses(input_text)
