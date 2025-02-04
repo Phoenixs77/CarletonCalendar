@@ -19,6 +19,20 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 # Initialize the database
 db = SQLAlchemy(app)
 
+# Define the UserEmail model to store email addresses
+class UserEmail(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+
+    def __repr__(self):
+        return f'<UserEmail {self.email}>'
+
+# Create the tables when the app starts
+@app.before_first_request
+def create_tables():
+    db.create_all()
+
+
 # HTML template with Tailwind CSS styling, instructions for Outlook, thank-you box, and email input.
 form_template = """
 <!doctype html>
@@ -112,6 +126,11 @@ def index():
         if not re.match(EMAIL_REGEX, user_email):
             return render_template_string(form_template, error="Please enter a valid email address.")
 
+        # Save to the database
+        new_email = UserEmail(email=user_email)
+        db.session.add(new_email)
+        db.session.commit()
+
         # Parse courses and generate ICS file
         parsedCourses = parseCourses(input_text)
         icsContent = generateICS(parsedCourses)
@@ -123,5 +142,18 @@ def index():
 
     return render_template_string(form_template)
 
+# Route to view all stored emails
+@app.route('/emails')
+def show_emails():
+    emails = UserEmail.query.all()  # Get all emails from the database
+    return render_template_string("""
+    <h1>Stored Emails</h1>
+    <ul>
+        {% for email in emails %}
+        <li>{{ email.email }}</li>
+        {% endfor %}
+    </ul>
+    """, emails=emails)
+
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=5000)
